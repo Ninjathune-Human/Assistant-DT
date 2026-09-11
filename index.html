@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Envoi des DT</title>
+<style>
+  :root {
+    --paper: #fbfbf9;
+    --ink: #16181a;
+    --muted: #6b7076;
+    --rule: #dedcd6;
+    --rule-soft: #ecece7;
+    --accent: #1f4b99;
+    --warn: #a8541c;
+    --gaz: #f2c200;
+    --elec: #c8102e;
+    --telecom: #159a4b;
+    --eau: #1f73b7;
+    --assai: #6b4b2a;
+    --chaleur: #7b3fa0;
+    --autre: #9aa0a6;
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    font-feature-settings: "kern" 1;
+    padding: max(24px, env(safe-area-inset-top)) 20px 96px;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  h1 {
+    font-size: 19px;
+    font-weight: 550;
+    letter-spacing: -0.01em;
+    margin: 0 0 2px;
+  }
+
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 32px; }
+
+  /* --- depot --- */
+  .drop {
+    border: 1px dashed var(--rule);
+    border-radius: 3px;
+    padding: 56px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .18s, background .18s;
+  }
+  .drop:hover, .drop:focus-visible { border-color: var(--accent); outline: none; }
+  .drop.over { border-color: var(--accent); background: #f2f5fa; }
+  .drop p { margin: 0; }
+  .drop .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+  .status { color: var(--muted); font-size: 14px; margin-top: 18px; min-height: 22px; }
+  .status.error { color: var(--warn); }
+
+  /* --- entete dossier --- */
+  .dossier {
+    display: grid;
+    grid-template-columns: 190px 1fr;
+    gap: 32px;
+    align-items: start;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 28px;
+  }
+  .emprise { width: 190px; height: 190px; display: block; }
+  .emprise path {
+    fill: rgba(31, 75, 153, .07);
+    stroke: var(--accent);
+    stroke-width: 1.25;
+    stroke-linejoin: round;
+  }
+  .emprise .anim {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: trace 1.1s cubic-bezier(.2, .7, .2, 1) forwards;
+  }
+  @keyframes trace { to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .emprise .anim { animation: none; stroke-dashoffset: 0; }
+  }
+
+  dl.facts { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 7px 22px; }
+  dl.facts dt { color: var(--muted); font-size: 13.5px; }
+  dl.facts dd { margin: 0; font-size: 14.5px; }
+  dl.facts dd.code { font-family: var(--mono); font-size: 13px; }
+
+  /* --- registre --- */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 0 12px 9px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  tbody td { padding: 11px 12px 11px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 1px solid var(--rule); }
+
+  td.key { width: 4px; padding-right: 14px; }
+  td.key i { display: block; width: 4px; height: 17px; border-radius: 1px; }
+
+  .who { font-weight: 500; }
+  .where { color: var(--muted); font-size: 13px; }
+  .net { color: var(--muted); font-size: 13.5px; }
+  .sens { color: var(--elec); font-size: 13px; }
+
+  .mail {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    word-break: break-all;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    line-height: 1.45;
+  }
+  .mail:hover, .mail:focus-visible { color: var(--accent); outline: none; text-decoration: underline; }
+  .mail.copied { color: var(--accent); }
+
+  td.mode { white-space: nowrap; font-size: 13px; color: var(--muted); }
+  td.mode.post { color: var(--warn); }
+
+  /* --- modele de courriel --- */
+  details.tpl { margin: 30px 0 0; border-top: 1px solid var(--rule); padding-top: 18px; }
+  details.tpl summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 14px;
+    user-select: none;
+    padding: 4px 0;
+  }
+  details.tpl summary::-webkit-details-marker { display: none; }
+  details.tpl summary svg { flex: none; transition: transform .2s ease; color: var(--muted); }
+  details.tpl[open] summary svg { transform: rotate(90deg); }
+  details.tpl summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  .tplbody { padding: 14px 0 4px; display: grid; gap: 12px; }
+  .tplbody label { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
+  .tplbody input, .tplbody textarea {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 9px 11px;
+    width: 100%;
+    resize: vertical;
+  }
+  .tplbody textarea { min-height: 300px; }
+  .tplbody input:focus, .tplbody textarea:focus { outline: none; border-color: var(--accent); }
+  .tokens { color: var(--muted); font-size: 12.5px; font-family: var(--mono); line-height: 1.9; }
+
+  /* --- actions --- */
+  .actions { margin-top: 34px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  button.go {
+    font: inherit;
+    font-size: 14.5px;
+    background: var(--ink);
+    color: var(--paper);
+    border: 1px solid var(--ink);
+    border-radius: 2px;
+    padding: 12px 22px;
+    min-height: 46px;
+    cursor: pointer;
+  }
+  button.go:hover { background: var(--accent); border-color: var(--accent); }
+  button.go:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  button.go[disabled] { opacity: .45; cursor: default; }
+  button.go.ghost { background: none; color: var(--ink); border-color: var(--rule); }
+  button.go.ghost:hover { background: none; border-color: var(--ink); color: var(--ink); }
+
+  .note {
+    margin-top: 26px;
+    padding: 14px 16px;
+    border-left: 2px solid var(--warn);
+    background: #fdf8f3;
+    font-size: 13.5px;
+    color: #4a3728;
+  }
+  .note p { margin: 0 0 6px; }
+  .note p:last-child { margin: 0; }
+
+  .hidden { display: none; }
+
+  @media (max-width: 720px) {
+    .dossier { grid-template-columns: 1fr; gap: 22px; }
+    .emprise { width: 150px; height: 150px; }
+    thead { display: none; }
+    tbody tr { display: grid; grid-template-columns: 4px 1fr; gap: 0 14px; padding: 14px 0; border-bottom: 1px solid var(--rule-soft); }
+    tbody td { border: 0; padding: 2px 0; }
+    td.key { grid-row: 1 / span 4; }
+    td.key i { height: 100%; min-height: 46px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Envoi des DT</h1>
+  <p class="sub">Déposez l’archive du guichet unique. Vous récupérez un courriel prêt à partir pour chaque exploitant.</p>
+
+  <div id="drop" class="drop" tabindex="0" role="button" aria-label="Déposer l’archive du guichet unique">
+    <p>Déposer l’archive du dossier de consultation</p>
+    <p class="hint">ou toucher pour choisir le fichier, format .zip</p>
+    <input id="file" type="file" accept=".zip,application/zip" class="hidden">
+  </div>
+
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+
+  <section id="result" class="hidden">
+    <div class="dossier">
+      <div id="empriseBox"></div>
+      <dl id="facts" class="facts"></dl>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Exploitant</th>
+          <th>Réseau</th>
+          <th>Envoi</th>
+          <th>Adresse</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div id="warn" class="note hidden"></div>
+
+    <details class="tpl">
+      <summary>
+        <svg width="9" height="12" viewBox="0 0 9 12" fill="none" aria-hidden="true"><path d="M1.5 1L7 6l-5.5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Modèle du courriel
+      </summary>
+      <div class="tplbody">
+        <label>Objet
+          <input id="tplSubject" type="text">
+        </label>
+        <label>Corps
+          <textarea id="tplBody" spellcheck="false"></textarea>
+        </label>
+        <p class="tokens" id="tokens"></p>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button id="build" class="go" type="button"></button>
+      <button id="postal" class="go ghost hidden" type="button"></button>
+    </div>
+  </section>
+</div>
+
+<script>
+"use strict";
+
+/* ============ décompression ============ */
+
+async function inflate(bytes, fmt) {
+  const ds = new DecompressionStream(fmt);
+  const buf = await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+const inflateRaw = (b) => inflate(b, "deflate-raw");
+
+// Les flux PDF portent souvent des octets parasites après la fin des données
+// compressées. On garde donc ce qui a été produit avant l’erreur.
+async function inflateZlibLoose(bytes) {
+  const ds = new DecompressionStream("deflate");
+  const writer = ds.writable.getWriter();
+  writer.write(bytes);
+  writer.close().catch(() => {});
+  const reader = ds.readable.getReader();
+  const parts = [];
+  let n = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value);
+      n += value.length;
+    }
+  } catch (e) { /* flux tronqué : on conserve la partie lue */ }
+  const out = new Uint8Array(n);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+
+/* ============ zip ============ */
+
+async function zipRead(bytes) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= 0 && i > bytes.length - 70000; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("archive illisible");
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const entries = [];
+  for (let i = 0; i < count; i++) {
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commLen = dv.getUint16(p + 32, true);
+    const method = dv.getUint16(p + 10, true);
+    const compSize = dv.getUint32(p + 20, true);
+    const localOff = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nameLen));
+    const lnLen = dv.getUint16(localOff + 26, true);
+    const leLen = dv.getUint16(localOff + 28, true);
+    const start = localOff + 30 + lnLen + leLen;
+    entries.push({ name, method, raw: bytes.subarray(start, start + compSize) });
+    p += 46 + nameLen + extraLen + commLen;
+  }
+  for (const e of entries) {
+    e.data = e.method === 8 ? await inflateRaw(e.raw) : e.raw.slice();
+  }
+  return entries;
+}
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(b) {
+  let c = 0xffffffff;
+  for (let i = 0; i < b.length; i++) c = CRC_TABLE[(c ^ b[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+async function deflateRaw(bytes) {
+  const cs = new CompressionStream("deflate-raw");
+  const buf = await new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+async function zipWrite(files) {
+  const body = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = new TextEncoder().encode(f.name);
+    const comp = await deflateRaw(f.data);
+    const crc = crc32(f.data);
+
+    const lh = new Uint8Array(30 + name.length);
+    const lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(6, 0x0800, true);
+    lv.setUint16(8, 8, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, comp.length, true);
+    lv.setUint32(22, f.data.length, true);
+    lv.setUint16(26, name.length, true);
+    lh.set(name, 30);
+    body.push(lh, comp);
+
+    const cd = new Uint8Array(46 + name.length);
+    const cv = new DataView(cd.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 8, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, comp.length, true);
+    cv.setUint32(24, f.data.length, true);
+    cv.setUint16(28, name.length, true);
+    cv.setUint32(42, offset, true);
+    cd.set(name, 46);
+    central.push(cd);
+    offset += lh.length + comp.length;
+  }
+  let cdSize = 0;
+  for (const c of central) cdSize += c.length;
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, central.length, true);
+  ev.setUint16(10, central.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob([...body, ...central, end], { type: "application/zip" });
+}
+
+/* ============ champs des Cerfa ============ */
+
+function pdfLiteral(text, at) {
+  let depth = 0, out = "";
+  for (let i = at; i < text.length; i++) {
+    const c = text[i];
+    if (c === "\\") { out += text[i + 1]; i++; continue; }
+    if (c === "(") { depth++; if (depth === 1) continue; }
+    if (c === ")") { depth--; if (depth === 0) return out; }
+    out += c;
+  }
+  return out;
+}
+
+async function pdfFields(bytes, wanted) {
+  const latin = new TextDecoder("latin1");
+  const whole = latin.decode(bytes);
+  const found = {};
+  const re = /stream\r?\n/g;
+  let m;
+  while ((m = re.exec(whole)) !== null) {
+    const start = m.index + m[0].length;
+    const end = whole.indexOf("endstream", start);
+    if (end < 0) continue;
+    const inflated = await inflateZlibLoose(bytes.subarray(start, end));
+    if (!inflated.length) continue;
+    const text = latin.decode(inflated);
+    if (text.indexOf("/T(") < 0) continue;
+    for (const name of wanted) {
+      const key = "/T(" + name + ")";
+      let at = -1;
+      while ((at = text.indexOf(key, at + 1)) >= 0) {
+        const next = text.indexOf("/T(", at + key.length);
+        const dict = text.slice(at, next < 0 ? text.length : next);
+        const v = dict.indexOf("/V(");
+        if (v >= 0) found[name] = pdfLiteral(dict, v + 2);
+      }
+    }
+  }
+  return found;
+}
+
+/* ============ lecture du dossier ============ */
+
+const NS_T = "http://www.reseaux-et-canalisations.gouv.fr/schema-teleservice/3.2";
+
+const RESEAUX = {
+  CANALISATIONS_GAZ_COMBUSTIBLES: ["Gaz combustible", "--gaz"],
+  CANALISATIONS_EAU_POTABLE: ["Eau potable", "--eau"],
+  CANALISATIONS_EAUX_USEES_OU_ASSAINISSEMENT: ["Assainissement", "--assai"],
+  RESEAUX_DE_CHALEUR_OU_DE_FROID: ["Chaleur ou froid", "--chaleur"],
+  LIGNES_ELECTRIQUES_ET_ECLAIRAGE_PUBLIC_HORS_TBT: ["Électricité, éclairage public", "--elec"],
+  COMMUNICATIONS_ELECTRONIQUES_ET_LIGNES_ELECTRIQUES_ECLAIRAGE_TBT: ["Communications électroniques", "--telecom"],
+  CANALISATIONS_PRODUITS_CHIMIQUES: ["Produits chimiques", "--autre"],
+  CANALISATIONS_HYDROCARBURES: ["Hydrocarbures", "--autre"],
+  INSTALLATIONS_FERROVIAIRES_OU_GUIDEES: ["Ferroviaire ou guidé", "--autre"],
+  AUTRE: ["Autre réseau", "--autre"]
+};
+
+function reseauLabel(code) {
+  if (RESEAUX[code]) return RESEAUX[code];
+  const readable = (code || "").toLowerCase().replace(/_/g, " ");
+  return [readable.charAt(0).toUpperCase() + readable.slice(1), "--autre"];
+}
+
+const txt = (node, tag) => {
+  if (!node) return "";
+  const el = node.getElementsByTagNameNS(NS_T, tag)[0];
+  return el ? el.textContent.trim() : "";
+};
+
+function normalise(s) {
+  return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function parseDossier(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+  if (doc.getElementsByTagName("parsererror").length) throw new Error("XML du dossier illisible");
+
+  const dt = doc.getElementsByTagNameNS(NS_T, "DT")[0] || doc.getElementsByTagNameNS(NS_T, "DICT")[0];
+  if (!dt) throw new Error("déclaration introuvable dans le XML");
+
+  const rep = dt.getElementsByTagNameNS(NS_T, "representantDuResponsableDeProjet")[0];
+  const lieu = dt.getElementsByTagNameNS(NS_T, "emplacementDuProjet")[0];
+  const cal = dt.getElementsByTagNameNS(NS_T, "projetEtSonCalendrier")[0];
+  const emprise = dt.getElementsByTagNameNS(NS_T, "emprise")[0];
+
+  const coordEl = emprise
+    ? (emprise.getElementsByTagName("gml:coordinates")[0] || emprise.getElementsByTagName("gml:posList")[0])
+    : null;
+  let pts = [];
+  if (coordEl) {
+    const raw = coordEl.textContent.trim();
+    pts = raw.indexOf(",") >= 0
+      ? raw.split(/\s+/).map((p) => p.split(",").map(Number))
+      : (() => {
+          const n = raw.split(/\s+/).map(Number);
+          const o = [];
+          for (let i = 0; i + 1 < n.length; i += 2) o.push([n[i + 1], n[i]]);
+          return o;
+        })();
+  }
+
+  const exploitants = [];
+  const ouvrages = doc.getElementsByTagNameNS(NS_T, "ouvrage");
+  for (const ouv of ouvrages) {
+    const contact = ouv.getElementsByTagNameNS(NS_T, "contact")[0];
+    if (!contact) continue;
+    const gestion = contact.getElementsByTagNameNS(NS_T, "gestionDesFichiersDematerialises")[0];
+    const nomEl = contact.getElementsByTagName("ie:NomFamille")[0];
+    const [label, colour] = reseauLabel(txt(ouv, "classeOuvrage"));
+    exploitants.push({
+      societe: txt(contact, "societe"),
+      agence: txt(contact, "agence"),
+      nom: nomEl ? nomEl.textContent.trim() : "",
+      courriel: txt(contact, "courriel"),
+      commune: txt(contact, "commune"),
+      codePostal: txt(contact, "codePostal"),
+      voie: [txt(contact, "numero"), txt(contact, "voie")].filter(Boolean).join(" "),
+      complement: txt(contact, "complement"),
+      lieuDit: txt(contact, "lieuDitBP"),
+      categorie: txt(ouv, "categorieOuvrage"),
+      reseau: label,
+      colour: colour,
+      demat: txt(gestion, "gereLesFichiersDematerialises") === "true",
+      format: txt(gestion, "formatDesFichiersDematerialises") || "XML"
+    });
+  }
+
+  return {
+    noConsultation: txt(dt, "noConsultationDuTeleserviceSeize"),
+    dateDeclaration: txt(dt, "dateDeLaDeclaration"),
+    affaire: txt(dt, "noAffaireDuResponsableDuProjet"),
+    conjointe: txt(dt, "declarationConjointeDTDICT") === "true",
+    typeDeclaration: dt.localName,
+    organisme: txt(dt.getElementsByTagNameNS(NS_T, "responsableDuProjet")[0], "denomination"),
+    signataire: txt(rep, "personneAcontacter") || txt(rep, "denomination"),
+    telephone: txt(rep, "tel"),
+    courriel: txt(rep, "courriel"),
+    adresse: txt(lieu, "adresse"),
+    cp: txt(lieu, "CP"),
+    commune: txt(lieu, "communePrincipale"),
+    projet: txt(cal, "decrivezLeProjet"),
+    dateDebut: txt(cal, "datePrevuePourLeCommencementDesTravaux").slice(0, 10),
+    duree: txt(cal, "dureeDuChantierEnJours"),
+    surface: Math.round(Number(txt(emprise, "surface")) || 0),
+    points: pts,
+    exploitants: exploitants
+  };
+}
+
+/* Les Cerfa ne sont pas numérotés dans l’ordre des ouvrages du XML.
+   On les rapproche sur la société, puis sur l’agence quand une même
+   société revient plusieurs fois. */
+function apparier(dossier, cerfas) {
+  const restants = dossier.exploitants.map((e, i) => ({ e: e, i: i, pris: false }));
+  for (const c of cerfas) {
+    const soc = normalise(c.fields.Exploitant);
+    const dest = normalise(c.fields.Destinataire);
+    let pool = restants.filter((r) => !r.pris && normalise(r.e.societe) === soc);
+    if (pool.length > 1) {
+      const affine = pool.filter((r) => r.e.agence && dest.indexOf(normalise(r.e.agence)) >= 0);
+      if (affine.length) pool = affine;
+    }
+    if (pool.length > 1) {
+      const parNom = pool.filter((r) => r.e.nom && dest.indexOf(normalise(r.e.nom)) >= 0);
+      if (parNom.length) pool = parNom;
+    }
+    if (pool.length) {
+      pool[0].pris = true;
+      pool[0].e.cerfa = c;
+    }
+  }
+  return dossier.exploitants.filter((e) => !e.cerfa);
+}
+
+/* ============ courriel ============ */
+
+const CRLF = "\r\n";
+const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+function dateFr(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return Number(d) + " " + MOIS[Number(m) - 1] + " " + y;
+}
+
+function telFr(t) {
+  const d = (t || "").replace(/\D/g, "");
+  return d.length === 10 ? d.replace(/(\d\d)(?=\d)/g, "$1 ") : (t || "");
+}
+
+function b64(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(s);
+}
+
+const b64utf8 = (str) => b64(new TextEncoder().encode(str));
+
+function wrap76(s) {
+  const out = [];
+  for (let i = 0; i < s.length; i += 76) out.push(s.slice(i, i + 76));
+  return out.join(CRLF);
+}
+
+// RFC 2047 : les en-têtes ne transportent pas d’accents en clair.
+// RFC 5322 : un nom affiché contenant une virgule ou un point-virgule doit
+// être entre guillemets, sinon il est lu comme un second destinataire.
+function phrase(s) {
+  if (!/^[\x20-\x7e]*$/.test(s)) return "=?UTF-8?B?" + b64utf8(s) + "?=";
+  if (/[,;:<>@"\\]/.test(s)) return '"' + s.replace(/(["\\])/g, "\\$1") + '"';
+  return s;
+}
+const header = (s) => (/^[\x20-\x7e]*$/.test(s) ? s : "=?UTF-8?B?" + b64utf8(s) + "?=");
+
+function mimeType(name) {
+  if (/\.pdf$/i.test(name)) return "application/pdf";
+  if (/\.xml$/i.test(name)) return "application/xml";
+  return "application/octet-stream";
+}
+
+function buildEml(from, to, subject, body, attachments) {
+  const bound = "----dt" + Math.random().toString(36).slice(2, 12);
+  const lines = [
+    "From: " + phrase(from.nom) + " <" + from.mail + ">",
+    "To: " + phrase(to.nom) + " <" + to.mail + ">",
+    "Subject: " + header(subject),
+    "Date: " + new Date().toUTCString().replace("GMT", "+0000"),
+    "MIME-Version: 1.0",
+    "X-Unsent: 1",
+    'Content-Type: multipart/mixed; boundary="' + bound + '"',
+    "",
+    "--" + bound,
+    'Content-Type: text/plain; charset="utf-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    wrap76(b64utf8(body))
+  ];
+  for (const a of attachments) {
+    lines.push(
+      "--" + bound,
+      'Content-Type: ' + mimeType(a.name) + '; name="' + a.name + '"',
+      "Content-Transfer-Encoding: base64",
+      'Content-Disposition: attachment; filename="' + a.name + '"',
+      "",
+      wrap76(b64(a.data))
+    );
+  }
+  lines.push("--" + bound + "--", "");
+  return new TextEncoder().encode(lines.join(CRLF));
+}
+
+/* ============ interface ============ */
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const SUJET_DEFAUT = "{{type}} {{noConsultation}} - {{commune}} - {{affaire}}";
+
+const CORPS_DEFAUT = [
+  "Madame, Monsieur,",
+  "",
+  "Veuillez trouver en pièces jointes les documents du dossier relatif à la demande visée en objet.",
+  "",
+  "{{piecesJointes}}",
+  "",
+  "Monsieur {{signataire}} ({{telephone}} - 06 18 10 32 37 - {{courriel}}) se tient à votre disposition pour vous apporter tout complément d\u2019information.",
+  "",
+  "Cordialement."
+].join("\n");
+
+let etat = null;
+
+function fill(template, dossier, exploitant, joints) {
+  const vals = {
+    type: dossier.conjointe ? "DT-DICT" : dossier.typeDeclaration,
+    noConsultation: dossier.noConsultation,
+    dateConsultation: dateFr(dossier.dateDeclaration),
+    affaire: dossier.affaire,
+    adresse: dossier.adresse,
+    cp: dossier.cp,
+    commune: dossier.commune,
+    projet: dossier.projet,
+    dateDebut: dateFr(dossier.dateDebut),
+    duree: dossier.duree,
+    signataire: dossier.signataire,
+    organisme: dossier.organisme,
+    telephone: telFr(dossier.telephone),
+    courriel: dossier.courriel,
+    exploitant: exploitant.societe,
+    destinataire: [exploitant.agence, exploitant.nom].filter(Boolean).join(" "),
+    reseau: exploitant.reseau,
+    piecesJointes: joints.map((j) => "- " + j.name).join("\n")
+  };
+  return template.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vals ? vals[k] : m));
+}
+
+function piecesPour(exploitant) {
+  const j = [etat.xmlFile];
+  if (exploitant.format === "XML_PDF") {
+    if (etat.emprise) j.push(etat.emprise);
+    if (exploitant.cerfa) j.push(exploitant.cerfa);
+  }
+  return j;
+}
+
+function drawEmprise(points) {
+  if (points.length < 3) return "";
+  const lat = points.reduce((s, p) => s + p[1], 0) / points.length;
+  const k = Math.cos((lat * Math.PI) / 180);
+  const xs = points.map((p) => p[0] * k), ys = points.map((p) => -p[1]);
+  const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+  const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+  const span = Math.max(maxX - minX, maxY - minY) || 1;
+  const pad = 10, size = 190;
+  const scale = (size - pad * 2) / span;
+  const ox = (size - (maxX - minX) * scale) / 2, oy = (size - (maxY - minY) * scale) / 2;
+  const d = points
+    .map((p, i) => (i ? "L" : "M") + ((p[0] * k - minX) * scale + ox).toFixed(1) + " " + ((-p[1] - minY) * scale + oy).toFixed(1))
+    .join(" ") + " Z";
+  return '<svg class="emprise" viewBox="0 0 190 190" role="img" aria-label="Emprise du chantier">' +
+    '<path class="anim" d="' + d + '"/></svg>';
+}
+
+function render() {
+  const d = etat.dossier;
+  $("empriseBox").innerHTML = drawEmprise(d.points);
+
+  const facts = [
+    ["Affaire", esc(d.affaire), ""],
+    ["Chantier", esc([d.adresse, d.cp + " " + d.commune].filter(Boolean).join(", ")), ""],
+    ["Emprise", d.surface.toLocaleString("fr-FR") + " m²", ""],
+    ["Début", dateFr(d.dateDebut) + ", " + d.duree + " jours", ""],
+    ["Consultation", esc(d.noConsultation) + ", du " + dateFr(d.dateDeclaration), "code"],
+    ["Responsable", esc(d.signataire) + ", " + esc(d.organisme), ""]
+  ];
+  $("facts").innerHTML = facts
+    .map((f) => "<dt>" + f[0] + "</dt><dd" + (f[2] ? ' class="' + f[2] + '"' : "") + ">" + f[1] + "</dd>")
+    .join("");
+
+  $("rows").innerHTML = d.exploitants
+    .map((e) => {
+      const nb = piecesPour(e).length;
+      const envoi = e.demat
+        ? '<td class="mode">Courriel, ' + nb + " pièce" + (nb > 1 ? "s" : "") + "</td>"
+        : '<td class="mode post">Courrier postal</td>';
+      const adresse = e.demat
+        ? '<button class="mail" type="button" data-mail="' + esc(e.courriel) + '">' + esc(e.courriel) + "</button>"
+        : '<span class="where">' + esc([e.complement, e.voie, e.lieuDit, e.codePostal + " " + e.commune].filter((x) => x && x.trim()).join(", ")) + "</span>";
+      return "<tr>" +
+        '<td class="key"><i style="background:var(' + e.colour + ')"></i></td>' +
+        '<td><span class="who">' + esc(e.societe) + "</span>" +
+          (e.agence ? '<br><span class="where">' + esc(e.agence) + "</span>" : "") + "</td>" +
+        '<td><span class="net">' + esc(e.reseau) + "</span>" +
+          (e.categorie === "S" ? '<br><span class="sens">réseau sensible</span>' : "") + "</td>" +
+        envoi +
+        "<td>" + adresse + "</td>" +
+        "</tr>";
+    })
+    .join("");
+
+  const alertes = [];
+  if (etat.sansCerfa.length) {
+    alertes.push("Cerfa non rapproché pour : " + etat.sansCerfa.map((e) => e.societe).join(", ") + ". Le courriel partira sans le formulaire personnalisé.");
+  }
+  const postaux = d.exploitants.filter((e) => !e.demat);
+  if (postaux.length) {
+    alertes.push(postaux.length + " exploitant" + (postaux.length > 1 ? "s n’acceptent" : " n’accepte") +
+      " pas l’envoi dématérialisé. À traiter par courrier, avec le plan d’emprise et le Cerfa imprimés.");
+  }
+  const warn = $("warn");
+  warn.innerHTML = alertes.map((a) => "<p>" + esc(a) + "</p>").join("");
+  warn.classList.toggle("hidden", alertes.length === 0);
+
+  const nbMails = d.exploitants.filter((e) => e.demat).length;
+  $("build").textContent = "Télécharger les " + nbMails + " courriels";
+  $("build").disabled = nbMails === 0;
+  const pb = $("postal");
+  pb.classList.toggle("hidden", postaux.length === 0);
+  pb.textContent = "Liste des envois postaux";
+
+  $("tokens").textContent = "Champs disponibles : {{type}} {{noConsultation}} {{dateConsultation}} {{affaire}} {{adresse}} {{cp}} {{commune}} {{projet}} {{dateDebut}} {{duree}} {{exploitant}} {{destinataire}} {{reseau}} {{piecesJointes}} {{signataire}} {{organisme}} {{telephone}} {{courriel}}";
+
+  $("result").classList.remove("hidden");
+}
+
+async function charger(file) {
+  const st = $("status");
+  st.className = "status";
+  st.textContent = "Lecture de l’archive…";
+  try {
+    const entries = await zipRead(new Uint8Array(await file.arrayBuffer()));
+
+    const descZip = entries.find((e) => /_description\.zip$/i.test(e.name));
+    if (!descZip) throw new Error("archive incomplète : le fichier _description.zip est absent");
+    const inner = await zipRead(descZip.data);
+    const xmlEntry = inner.find((e) => /^(?!Signature).*_description\.xml$/i.test(e.name.split("/").pop()));
+    if (!xmlEntry) throw new Error("archive incomplète : le XML de description est absent");
+
+    const dossier = parseDossier(new TextDecoder().decode(xmlEntry.data));
+
+    st.textContent = "Lecture des " + dossier.exploitants.length + " formulaires Cerfa…";
+    const cerfas = [];
+    for (const e of entries) {
+      if (!/_\d+\.pdf$/i.test(e.name)) continue;
+      const fields = await pdfFields(e.data, ["Exploitant", "Destinataire"]);
+      if (fields.Exploitant) cerfas.push({ name: e.name.split("/").pop(), data: e.data, fields: fields });
+    }
+
+    const emprise = entries.find((e) => /_emprise\.pdf$/i.test(e.name));
+
+    etat = {
+      dossier: dossier,
+      xmlFile: { name: xmlEntry.name.split("/").pop(), data: xmlEntry.data },
+      emprise: emprise ? { name: emprise.name.split("/").pop(), data: emprise.data } : null,
+      sansCerfa: apparier(dossier, cerfas)
+    };
+
+    render();
+    st.textContent = dossier.exploitants.length + " exploitants, " + cerfas.length + " Cerfa lus.";
+  } catch (err) {
+    st.className = "status error";
+    st.textContent = "Lecture impossible : " + err.message;
+    $("result").classList.add("hidden");
+  }
+}
+
+async function telecharger(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+async function construire() {
+  const d = etat.dossier;
+  const cibles = d.exploitants.filter((e) => e.demat);
+  const btn = $("build");
+  const libelle = btn.textContent;
+  btn.disabled = true;
+
+  const from = { nom: d.signataire + ", " + d.organisme, mail: d.courriel };
+  const files = [];
+  let n = 0;
+  for (const e of cibles) {
+    n++;
+    btn.textContent = "Préparation " + n + " / " + cibles.length;
+    await new Promise((r) => setTimeout(r));
+    const joints = piecesPour(e);
+    const to = { nom: [e.societe, e.agence].filter(Boolean).join(" "), mail: e.courriel };
+    const eml = buildEml(
+      from, to,
+      fill($("tplSubject").value, d, e, joints),
+      fill($("tplBody").value, d, e, joints),
+      joints
+    );
+    const slug = (e.societe + "-" + (e.agence || e.reseau))
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
+    files.push({ name: String(n).padStart(2, "0") + "_" + slug + ".eml", data: eml });
+  }
+
+  btn.textContent = "Compression…";
+  await telecharger(await zipWrite(files), "courriels_" + d.noConsultation + ".zip");
+  btn.textContent = libelle;
+  btn.disabled = false;
+}
+
+function listePostale() {
+  const d = etat.dossier;
+  const lignes = ["Envois postaux, dossier " + d.noConsultation + ", " + d.affaire, ""];
+  d.exploitants.filter((e) => !e.demat).forEach((e, i) => {
+    lignes.push(
+      (i + 1) + ". " + e.societe + (e.agence ? ", " + e.agence : ""),
+      "   " + [e.complement, e.voie, e.lieuDit].filter((x) => x && x.trim()).join(", "),
+      "   " + e.codePostal + " " + e.commune,
+      "   Réseau : " + e.reseau + (e.categorie === "S" ? ", sensible" : ""),
+      "   À joindre : plan d’emprise imprimé et Cerfa personnalisé" + (e.cerfa ? " (" + e.cerfa.name + ")" : ""),
+      ""
+    );
+  });
+  telecharger(new Blob([lignes.join("\r\n")], { type: "text/plain;charset=utf-8" }),
+    "envois_postaux_" + d.noConsultation + ".txt");
+}
+
+/* --- branchements --- */
+
+$("tplSubject").value = SUJET_DEFAUT;
+$("tplBody").value = CORPS_DEFAUT;
+
+const drop = $("drop"), input = $("file");
+drop.addEventListener("click", () => input.click());
+drop.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+});
+input.addEventListener("change", () => { if (input.files[0]) charger(input.files[0]); });
+["dragenter", "dragover"].forEach((t) =>
+  drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) =>
+  drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => {
+  const f = e.dataTransfer.files[0];
+  if (f) charger(f);
+});
+
+$("rows").addEventListener("click", (e) => {
+  const b = e.target.closest(".mail");
+  if (!b) return;
+  navigator.clipboard.writeText(b.dataset.mail).then(() => {
+    b.classList.add("copied");
+    setTimeout(() => b.classList.remove("copied"), 900);
+  });
+});
+
+$("build").addEventListener("click", construire);
+$("postal").addEventListener("click", listePostale);
+</script>
+</body>
+</html>

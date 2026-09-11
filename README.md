@@ -6,7 +6,9 @@ Outil mono-fichier (HTML/JS, sans dépendance ni build) pour générer les courr
 
 ## Usage
 
-Ouvrir `dt-envoi.html` dans un navigateur, déposer l'archive `.zip` du dossier. L'outil :
+`index.html` est une copie de `dt-envoi.html`, servie à la racine pour GitHub Pages. Les deux fichiers doivent rester identiques.
+
+Ouvrir `dt-envoi.html` (ou `index.html`) dans un navigateur, déposer l'archive `.zip` du dossier. L'outil :
 
 - lit le XML de description et les formulaires Cerfa embarqués (décompression zip/deflate en JS natif, aucune bibliothèque externe)
 - rapproche chaque Cerfa avec son exploitant (société, agence, nom)
