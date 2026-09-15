@@ -683,7 +683,7 @@ const CORPS_DEFAUT = [
   "",
   "{{piecesJointes}}",
   "",
-  "Monsieur {{signataire}} ({{telephone}} - 06 18 10 32 37 - {{courriel}}) se tient à votre disposition pour vous apporter tout complément d\u2019information.",
+  "Je me tiens à votre disposition pour vous apporter tout complément d\u2019information ({{telephone}} - {{courriel}}).",
   "",
   "Cordialement."
 ].join("\n");
@@ -785,7 +785,8 @@ function render() {
   const postaux = d.exploitants.filter((e) => !e.demat);
   if (postaux.length) {
     alertes.push(postaux.length + " exploitant" + (postaux.length > 1 ? "s n’acceptent" : " n’accepte") +
-      " pas l’envoi dématérialisé. À traiter par courrier, avec le plan d’emprise et le Cerfa imprimés.");
+      " pas l’envoi dématérialisé : " + postaux.map((e) => e.societe + (e.agence ? " (" + e.agence + ")" : "")).join(", ") +
+      ". À traiter par courrier, avec le plan d’emprise et le Cerfa imprimés.");
   }
   const warn = $("warn");
   warn.innerHTML = alertes.map((a) => "<p>" + esc(a) + "</p>").join("");
