@@ -458,7 +458,7 @@ async function pdfFields(bytes, wanted) {
 
 /* ============ lecture du dossier ============ */
 
-const NS_T = "http://www.reseaux-et-canalisations.gouv.fr/schema-teleservice/3.2";
+let NS_T = "http://www.reseaux-et-canalisations.gouv.fr/schema-teleservice/3.2";
 
 const RESEAUX = {
   CANALISATIONS_GAZ_COMBUSTIBLES: ["Gaz combustible", "--gaz"],
@@ -492,6 +492,10 @@ function normalise(s) {
 function parseDossier(xmlText) {
   const doc = new DOMParser().parseFromString(xmlText, "application/xml");
   if (doc.getElementsByTagName("parsererror").length) throw new Error("XML du dossier illisible");
+
+  // Le schéma du guichet unique évolue de version en version (3.2, 3.3…) :
+  // on utilise le namespace réellement déclaré sur la racine du document.
+  NS_T = doc.documentElement.namespaceURI || NS_T;
 
   const dt = doc.getElementsByTagNameNS(NS_T, "DT")[0] || doc.getElementsByTagNameNS(NS_T, "DICT")[0];
   if (!dt) throw new Error("déclaration introuvable dans le XML");
